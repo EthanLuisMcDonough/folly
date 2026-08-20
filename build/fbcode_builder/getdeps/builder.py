@@ -1066,7 +1066,7 @@ class Boost(BuilderBase):
         for link in linkage:
             bootstrap_args = self.manifest.get_section_as_args(
                 "bootstrap.args", self.ctx
-            )
+            ) + ["--with-toolset=clang"]
             if self.build_opts.is_windows():
                 bootstrap = os.path.join(self.src_dir, "bootstrap.bat")
                 self._run_cmd([bootstrap] + bootstrap_args, cwd=self.src_dir, env=env)
