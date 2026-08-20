@@ -416,6 +416,8 @@ option(PYTHON_EXTENSIONS
   OFF
 )
 
+option(DISABLE_LIBUNWIND "Disables libunwind" OFF)
+
 add_library(folly
   $<TARGET_OBJECTS:folly_base>
 )
