@@ -17,6 +17,7 @@
 #include <folly/hash/Hash.h>
 #include <folly/hash/MurmurHash.h>
 #include <folly/hash/rapidhash.h>
+#include <folly/hash/Murmur3Tao.h>
 
 #include <stdint.h>
 
@@ -236,6 +237,7 @@ int main(int argc, char** argv) {
   BENCHMARK_HASH(RapidHash);
   BENCHMARK_HASH(RapidHashMicro);
   BENCHMARK_HASH(RapidHashNano);
+  BENCHMARK_HASH(MurmurHash3_Tao);
 
 #undef BENCHMARK_HASH
 
