@@ -27,59 +27,92 @@ namespace hash {
 
 namespace detail {
 
-FOLLY_ALWAYS_INLINE constexpr std::uint64_t shiftMix(std::uint64_t v) {
-  constexpr std::uint64_t kShift = 47;
-  return v ^ (v >> kShift);
+static inline std::uint32_t rotl32 ( std::uint32_t x, std::int8_t r )
+{
+  return (x << r) | (x >> (32 - r));
 }
 
-FOLLY_ALWAYS_INLINE constexpr std::uint64_t constexprLoad64(
-    const char* s, std::size_t l) {
-  static_assert(kIsLittleEndian);
+//-----------------------------------------------------------------------------
+// Block read - if your platform needs to do endian-swapping or can only
+// handle aligned reads, do the conversion here
 
-  std::uint64_t ret = 0;
-  for (std::size_t i = 0; i < l; ++i) {
-    ret |= std::uint64_t(static_cast<uint8_t>(s[i])) << (i * 8);
-  }
-  return ret;
+static FOLLY_ALWAYS_INLINE std::uint32_t getblock32 ( const std::uint32_t * p, int i )
+{
+  return p[i];
+}
+
+//-----------------------------------------------------------------------------
+// Finalization mix - force all bits of a hash block to avalanche
+
+static FOLLY_ALWAYS_INLINE std::uint32_t fmix32 ( std::uint32_t h )
+{
+  h ^= h >> 16;
+  h *= 0x85ebca6b;
+  h ^= h >> 13;
+  h *= 0xc2b2ae35;
+  h ^= h >> 16;
+
+  return h;
 }
 
 } // namespace detail
 
 /*
- * Implementation of MurmurHash2 hashing algorithm for 64-bit
- * platforms.
+ * Taobench murmur3
  *
  * https://en.wikipedia.org/wiki/MurmurHash
  */
-constexpr std::uint64_t murmurHash64(
-    const char* key, std::size_t len, std::uint64_t seed) noexcept {
-  constexpr std::uint64_t kMul = 0xc6a4a7935bd1e995UL;
+constexpr std::uint64_t murmurHash64(const char* key, std::size_t length, std::uint64_t seed) noexcept {
+  const std::uint8_t * data = (const std::uint8_t*)key;
+  const int nblocks = length / 4;
 
-  std::uint64_t hash = seed ^ (len * kMul);
+  std::uint32_t h1 = seed;
 
-  const char* beg = key;
-  const char* end = beg + (len & ~0x7);
-  const std::size_t tail = len & 0x7;
+  std::uint32_t c1 = 0xcc9e2d51;
+  std::uint32_t c2 = 0x1b873593;
 
-  for (const char* p = beg; p != end; p += 8) {
-    const std::uint64_t k = folly::is_constant_evaluated_or(false)
-        ? detail::constexprLoad64(p, 8)
-        : loadUnaligned<std::uint64_t>(p);
-    hash = (hash ^ detail::shiftMix(k * kMul) * kMul) * kMul;
+  //----------
+  // body
+
+  const std::uint32_t * blocks = (const std::uint32_t *)(data + nblocks*4);
+
+  for(int i = -nblocks; i; i++)
+  {
+    std::uint32_t k1 = detail::getblock32(blocks,i);
+
+    k1 *= c1;
+    k1 = detail::rotl32(k1,15);
+    k1 *= c2;
+
+    h1 ^= k1;
+    h1 = detail::rotl32(h1,13);
+    h1 = h1*5+0xe6546b64;
   }
 
-  if (tail != 0) {
-    const std::uint64_t k = folly::is_constant_evaluated_or(false)
-        ? detail::constexprLoad64(end, tail)
-        : partialLoadUnaligned<std::uint64_t>(end, tail);
-    hash ^= k;
-    hash *= kMul;
-  }
+  //----------
+  // tail
 
-  hash = detail::shiftMix(hash) * kMul;
-  hash = detail::shiftMix(hash);
+  const std::uint8_t * tail = (const std::uint8_t*)(data + nblocks*4);
 
-  return hash;
+  std::uint32_t k1 = 0;
+
+  switch(length & 3)
+  {
+  case 3: k1 ^= tail[2] << 16;
+  case 2: k1 ^= tail[1] << 8;
+  case 1: k1 ^= tail[0];
+          k1 *= c1; k1 = detail::rotl32(k1,15); k1 *= c2; h1 ^= k1;
+  };
+
+  //----------
+  // finalization
+
+  h1 ^= length;
+
+  h1 = detail::fmix32(h1);
+
+  //*(std::uint32_t*)out = h1;
+  return h1;
 }
 
 } // namespace hash
