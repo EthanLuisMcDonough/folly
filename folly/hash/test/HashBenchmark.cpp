@@ -46,8 +46,9 @@ std::vector<uint8_t> benchData = randomBytes(1 << 20); // 1MiB, fits in cache.
 template <class Hasher>
 void bmHasher(Hasher hasher, size_t k, size_t iters) {
   CHECK_LE(k, benchData.size());
+  const size_t wrap = benchData.size() - k + 1;
   for (size_t i = 0, pos = 0; i < iters; ++i, ++pos) {
-    if (pos == benchData.size() - k + 1) {
+    if (pos == wrap) {
       pos = 0;
     }
     folly::doNotOptimizeAway(hasher(benchData.data() + pos, k));
